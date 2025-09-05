@@ -1,6 +1,6 @@
-# app_food101_final.py
+# app_food101_hf.py
 # --------------------------
-# Streamlit Food-101 Image Classifier (No external label file)
+# Streamlit Food-101 Image Classifier (Load model dari Hugging Face)
 # --------------------------
 
 import os
@@ -12,6 +12,7 @@ import numpy as np
 import plotly.express as px
 from PIL import Image
 import random
+from huggingface_hub import hf_hub_download
 
 # -----------------------------
 # Page & Theme
@@ -26,28 +27,26 @@ st.title("🍔🍣 Food-101 Image Classifier")
 st.markdown("Upload gambar makanan, model akan mengklasifikasikan salah satu dari **101 kelas Food-101**.")
 
 # -----------------------------
-# Path relatif model
+# Hugging Face Model Loader
 # -----------------------------
-BASE_DIR = os.path.dirname(__file__)
-MODEL_PATH = os.path.join(BASE_DIR, "model_food_101.h5")  # simpan model di folder project
+HF_REPO_ID = "Syahhh01/food101"  
+MODEL_FILENAME = "model_food_101.h5" 
 PROB_DECIMALS = 3
 
-# -----------------------------
-# Load model
-# -----------------------------
 @st.cache_resource(show_spinner=True)
-def load_my_model(path):
-    model = load_model(path)
+def load_my_model_from_hf(repo_id, filename):
+    local_model_path = hf_hub_download(repo_id=repo_id, filename=filename, repo_type="model")
+    model = load_model(local_model_path)
     return model
 
-with st.spinner("Loading model..."):
+with st.spinner("Loading model from Hugging Face..."):
     try:
-        model = load_my_model(MODEL_PATH)
-        IMG_SIZE = model.input_shape[1:3]  # otomatis ambil H,W dari model
+        model = load_my_model_from_hf(HF_REPO_ID, MODEL_FILENAME)
+        IMG_SIZE = model.input_shape[1:3]  # ambil H,W dari model
         NUM_CLASSES = model.output_shape[-1]
         st.success(f"Model loaded. Input size: {IMG_SIZE}, Number of classes: {NUM_CLASSES}")
     except Exception as e:
-        st.error("Gagal memuat model. Pastikan model .h5 ada di folder project.")
+        st.error("Gagal memuat model dari Hugging Face.")
         st.exception(e)
         st.stop()
 
@@ -116,8 +115,13 @@ if uploaded_file is not None:
         "Class": [LABEL_MAP[i] for i in top_indices],
         "Probability": [probs[i] for i in top_indices]
     }
-    fig = px.bar(df_probs, x="Class", y="Probability", text=[f"{p:.{PROB_DECIMALS}f}" for p in df_probs["Probability"]],
-                 title="Top 10 Class Probabilities", range_y=[0, 1])
-    fig.update_traces(marker_color=[CLASS_COLORS.get(c, None) for c in df_probs["Class"]],
-                      textposition="outside")
+    fig = px.bar(
+        df_probs, x="Class", y="Probability",
+        text=[f"{p:.{PROB_DECIMALS}f}" for p in df_probs["Probability"]],
+        title="Top 10 Class Probabilities", range_y=[0, 1]
+    )
+    fig.update_traces(
+        marker_color=[CLASS_COLORS.get(c, None) for c in df_probs["Class"]],
+        textposition="outside"
+    )
     st.plotly_chart(fig, use_container_width=True)
